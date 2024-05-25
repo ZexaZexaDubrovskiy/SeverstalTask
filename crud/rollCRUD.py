@@ -1,49 +1,29 @@
-#  Date: 2021.03.01
-#  Author: dharapx
-#  Feel free to use this code
-#  -------------------------------------------------------------------------------
-#  Here we are having methods for CRUD operation
-#  -------------------------------------------------------------------------------
-
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-import model
-import schema
+import models.model as model
+import schemas.schema as schema
 from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy import func, or_
+import crud.storageCRUD as storageCRUD
 
 def add_roll_details_to_db(db: Session, roll: schema.RollAdd):
-    mv_details = model.Rolls(
+    newRoll = model.Rolls(
         weight = roll.weight,
         lenght = roll.lenght
     )
+    save_data_in_db(db, newRoll)
 
-    db.add(mv_details)
-    db.commit()
-    db.refresh(mv_details)
-
-    rollInStorage = model.Storage(
-        roll_id = mv_details.id
+    newRollInStorage = model.Storage(
+        roll_id = newRoll.id
     )
-    db.add(rollInStorage)
-    db.commit()
-    db.refresh(rollInStorage)
-
-    
+    save_data_in_db(db, newRollInStorage)
 
     return model.Rolls(**roll.dict())
 
-def get_rolls(db: Session):
-    return db.query(model.Rolls).all()
-
-def get_roll_by_id(db: Session, roll_id: int):
-    return db.query(model.Rolls).filter(model.Rolls.id == roll_id).first()
-
-
-
 def get_rolls_with_filter(db: Session, sort_by: List[str]):
     
-    allRollsIdInStorage = getAllRollIdInStorage(db)
+    allRollsIdInStorage = storageCRUD.get_all_roll_id_in_storage(db)
 
     rolls = db.query(model.Rolls).filter(model.Rolls.id.in_(allRollsIdInStorage))
     
@@ -52,18 +32,22 @@ def get_rolls_with_filter(db: Session, sort_by: List[str]):
         for field, order in sort_params:
             if order == "desc":
                 rolls = rolls.order_by(getattr(model.Rolls, field).desc())
-            else:
+            elif order == "asc":
                 rolls = rolls.order_by(getattr(model.Rolls, field))
+            else:
+                raise HTTPException(status_code=400, detail=f"incorrect second parametr: {order}")
 
     return rolls.all()
 
-#2024-05-24 11:30:00
 def get_rolls_for_period(db: Session, startDate: datetime, endDate: datetime):
 
     rolls_query = db.query(model.Rolls).filter(
         model.Rolls.added_at >= startDate,
         or_(model.Rolls.deleted_at <= endDate, model.Rolls.deleted_at == None)
     )
+
+    if not rolls_query.count():
+        raise HTTPException(status_code=404, detail=f"No records found")
         
     average_weight = rolls_query.with_entities(func.avg(model.Rolls.weight)).scalar()
     average_length = rolls_query.with_entities(func.avg(model.Rolls.lenght)).scalar()
@@ -115,38 +99,22 @@ def get_rolls_for_period(db: Session, startDate: datetime, endDate: datetime):
         "min_rolls_day": min_rolls_day.date_added if min_rolls_day else None,
     }
 
-
-
-
-
-
-def get_roll_by_id_in_storage(db: Session, roll_id: int):
-    return db.query(model.Storage).filter(model.Storage.roll_id == roll_id).first()
-
-
 def delete_roll_details_by_id_in_storage(db: Session, roll_id: int):
     try:
         db.query(model.Storage).filter(model.Storage.id == roll_id).delete()
 
-        
         old_data = db.query(model.Rolls).filter(model.Rolls.id == roll_id).first()
         old_data.deleted_at = datetime.now()
-
         db.commit()
         
     except Exception as e:
         raise Exception(e)
 
 
+def save_data_in_db(db: Session, data):
+    db.add(data)
+    db.commit()
+    db.refresh(data)
 
-
-
-
-#storage
-def get_info_storage(db: Session):
-   return db.query(model.Storage).all()
-
-
-
-def getAllRollIdInStorage(db: Session):
-    return [storage.id for storage in db.query(model.Storage).all()]
+def get_roll_by_id(db: Session, roll_id: int):
+    return db.query(model.Rolls).filter(model.Rolls.id == roll_id).first()

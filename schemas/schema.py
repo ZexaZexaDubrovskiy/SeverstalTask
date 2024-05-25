@@ -23,25 +23,8 @@ class Roll(RollBase):
         orm_mode = True
 
 
-class UpdateRoll(BaseModel):
-    deleted_at: datetime
-
-    class Config:
-        orm_mode = True
-
-
-
-
-
-
-
 class StorageBase(BaseModel):
     roll_id: int
-
-class StorageAdd(StorageBase):
-    
-    class Config:
-        orm_mode = True
 
 class Storage(StorageBase):
     id: int

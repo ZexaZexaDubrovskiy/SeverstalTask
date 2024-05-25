@@ -1,9 +1,10 @@
 from typing import List
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
-import crud
-import model
-import schema
+import crud.rollCRUD as rollCRUD
+import crud.storageCRUD as storageCRUD
+import models.model as model
+import schemas.schema as schema
 from db_handler import SessionLocal, engine
 from datetime import datetime
 
@@ -20,45 +21,33 @@ def get_db():
     finally:
         db.close()
 
-@app.post('/add_new_roll', response_model=schema.RollAdd)
+
+@app.post('/add_new_roll', response_model=schema.RollAdd, description="Enter the weight and length of the roll")
 def add_new_roll(roll: schema.RollAdd, db: Session = Depends(get_db)):
-    roll = crud.add_roll_details_to_db(db=db, roll = roll)
+    roll = rollCRUD.add_roll_details_to_db(db=db, roll = roll)
     return roll
 
-
-@app.get('/get_rolls', response_model=List[schema.Roll])
-def get_rolls(db: Session = Depends(get_db)):
-    rolls = crud.get_rolls(db=db)
-    return rolls
-
-@app.delete('/delete_roll_by_id_in_storage')
+@app.delete('/delete_roll_by_id_in_storage', description="Specify the address of the roll in the storage")
 def delete_roll_by_id_in_storage(roll_id: int, db: Session = Depends(get_db)):
-    details = crud.get_roll_by_id_in_storage(db=db, roll_id=roll_id)
-    if not details:
+    rollDeleted = storageCRUD.get_roll_by_id_in_storage(db=db, roll_id=roll_id)
+    if not rollDeleted:
         raise HTTPException(status_code=404, detail=f"No record found to delete")
 
     try:
-        crud.delete_roll_details_by_id_in_storage(db=db, roll_id=roll_id)
+        rollCRUD.delete_roll_details_by_id_in_storage(db=db, roll_id=roll_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Unable to delete: {e}")
-    return crud.get_roll_by_id(db=db,  roll_id = details.id)
+    return rollCRUD.get_roll_by_id(db=db,  roll_id = rollDeleted.id)
 
 
-
-@app.get('/get_rolls_with_filter', response_model=List[schema.Roll])
+@app.get('/get_rolls_with_filter', response_model=List[schema.Roll], description="Use this mask for each filter\"id:asc\" and\or \"weight:desc\"")
 def get_rolls_with_filter(db: Session = Depends(get_db), sort_by: List[str] = Query(None)):
-    return crud.get_rolls_with_filter(db=db, sort_by = sort_by)
+    try:
+        return rollCRUD.get_rolls_with_filter(db=db, sort_by = sort_by)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"incorrect mask: {e}")
+    
 
-@app.get('/get_rolls_for_period')
+@app.get('/get_rolls_for_period', description="Enter the date in the dateTime format")
 def get_rolls_for_period(startDate: datetime, endDate: datetime, db: Session = Depends(get_db)):
-    return crud.get_rolls_for_period(db=db, startDate = startDate, endDate = endDate)
-
-
-
-
-
-
-@app.get('/get_info_storage', response_model=List[schema.Storage])
-def get_info_storage(db: Session = Depends(get_db)):
-    storage = crud.get_info_storage(db=db)
-    return storage
+    return rollCRUD.get_rolls_for_period(db=db, startDate = startDate, endDate = endDate)
