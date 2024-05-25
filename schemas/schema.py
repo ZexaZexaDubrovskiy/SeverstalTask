@@ -11,7 +11,7 @@ class RollBase(BaseModel):
 class RollAdd(RollBase):
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Roll(RollBase):
@@ -20,7 +20,7 @@ class Roll(RollBase):
     deleted_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class StorageBase(BaseModel):
@@ -30,4 +30,4 @@ class Storage(StorageBase):
     id: int
     
     class Config:
-        orm_mode = True        
+        from_attributes = True        
